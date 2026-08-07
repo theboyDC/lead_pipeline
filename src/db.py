@@ -1,4 +1,10 @@
-# src/db.py
+"""This file manages the SQLite connection lifecycle and schema initialization.
+It uses sqlite3
+Row to return rows as dictionary-like objects,
+which simplifies working with data downstream."""
+
+
+
 import sqlite3
 import os
 
@@ -34,3 +40,5 @@ def init_db():
 if __name__ == "__main__":
     init_db()
     print("Database initialized successfully.")
+    
+    
