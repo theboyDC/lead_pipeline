@@ -38,3 +38,28 @@ def extract_landing_page_text(url: str) -> str:
         print(f"[!] Scraping Error for {url}: {e}")
         return ""
 
+def ingest_lead(company_name: str, website_url: str, founder_name: str = "Founder", linkedin_url: str = "") -> bool:
+    """
+    Extracts site content and writes a new lead record into SQLite.
+    Prevents duplicate entries based on the UNIQUE website_url constraint.
+    """
+    print(f"[*] Ingesting: {company_name} ({website_url})...")
+    site_text = extract_landing_page_text(website_url)
+
+    if not site_text:
+        print(f"[!] Warning: No text content extracted for {company_name}. Storing basic profile.")
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                INSERT INTO founders (company_name, website_url, founder_name, linkedin_url, site_raw_text)
+                VALUES (?, ?, ?, ?, ?)
+            """, (company_name, website_url, founder_name, linkedin_url, site_text))
+            conn.commit()
+            print(f"[✓] Successfully ingested {company_name} into database!")
+            return True
+        except sqlite3.IntegrityError:
+            print(f"[!] Duplicate skipped: {website_url} already exists in database.")
+            return False
+
