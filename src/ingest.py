@@ -62,4 +62,9 @@ def ingest_lead(company_name: str, website_url: str, founder_name: str = "Founde
         except sqlite3.IntegrityError:
             print(f"[!] Duplicate skipped: {website_url} already exists in database.")
             return False
+if __name__ == "__main__":
+    # Test run script against a real website
+    test_company = "Example Corp"
+    test_url = "https://example.com"
+    ingest_lead(test_company, test_url, "Jane Doe", "https://linkedin.com/in/janedoe")
 
