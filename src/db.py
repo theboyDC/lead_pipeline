@@ -1,44 +1,26 @@
-"""This file manages the SQLite connection lifecycle and schema initialization.
-It uses sqlite3
-Row to return rows as dictionary-like objects,
-which simplifies working with data downstream."""
+"""
+Small helper module for creating a PostgreSQL connection.
+Reads credentials from environment variables (loaded from .env via
+python-dotenv), so no secrets are hardcoded in the codebase.
+"""
 
-
-
-import sqlite3
 import os
+import psycopg2
+from dotenv import load_dotenv
 
-DB_NAME = "pipeline_data.db"
+load_dotenv()
+
 
 def get_connection():
-    """Establishes and returns a connection to the SQLite database."""
-    conn = sqlite3.connect(DB_NAME)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-def init_db():
-    """Initializes the database schema if it doesn't already exist."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS founders (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                company_name TEXT NOT NULL,
-                website_url TEXT UNIQUE NOT NULL,
-                founder_name TEXT DEFAULT 'Founder',
-                linkedin_url TEXT,
-                site_raw_text TEXT,
-                pain_point TEXT,          -- Technical friction identified
-                proposed_solution TEXT,   -- Specific backend code solution
-                generated_pitch TEXT,     -- Tailored outreach message
-                outreach_status TEXT DEFAULT 'Pending',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-        """)
-        conn.commit()
-
-if __name__ == "__main__":
-    init_db()
-    print("Database initialized successfully.")
-    
-    
+    """
+    Returns a new psycopg2 connection using credentials from .env.
+    Callers are responsible for closing the connection (or using it
+    as a context manager).
+    """
+    return psycopg2.connect(
+        host=os.getenv("DB_HOST", "localhost"),
+        port=os.getenv("DB_PORT", "5432"),
+        dbname=os.getenv("DB_NAME", "weather_db"),
+        user=os.getenv("DB_USER", "weather_user"),
+        password=os.getenv("DB_PASSWORD", "weather_pass"),
+    )
