@@ -9,6 +9,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+
+
+
 def transform_all(raw_records: list[dict]) -> pd.DataFrame:
     """
     Converts a list of raw Open-Meteo JSON responses into a tidy DataFrame
