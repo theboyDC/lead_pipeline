@@ -1,6 +1,6 @@
 """
 Extract stage: pulls hourly weather data from the Open-Meteo API
-for a fixed list of cities. No API key required.
+for a fixed list of cities. No API key required........
 """
 
 import requests
@@ -15,6 +15,12 @@ CITIES = [
     {"name": "Nairobi", "country": "KE", "lat": -1.2921, "lon": 36.8219},
     {"name": "Lagos", "country": "NG", "lat": 6.5244, "lon": 3.3792},
 ]
+
+
+
+
+
+
 
 BASE_URL = "https://api.open-meteo.com/v1/forecast"
 

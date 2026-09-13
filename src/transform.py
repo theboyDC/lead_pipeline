@@ -1,6 +1,6 @@
 """
 Transform stage: takes raw API JSON responses and reshapes them
-into a clean pandas DataFrame matching the `readings` table schema.
+into a clean pandas DataFrame matching the `readings` table schema.......
 """
 
 import pandas as pd

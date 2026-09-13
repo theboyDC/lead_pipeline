@@ -1,7 +1,7 @@
 """
 Orchestrates the full ETL run: extract -> transform -> load.
 This is the entry point you'd run manually, via cron, or eventually
-hand off to an orchestrator like Airflow.
+hand off to an orchestrator like Airflow..........
 """
 
 
@@ -44,6 +44,14 @@ def run_pipeline():
         if not raw_records:
             logger.error("No data extracted — aborting run")
             return
+
+
+
+
+
+
+
+
 
         clean_df = transform_all(raw_records)
         if clean_df.empty:
