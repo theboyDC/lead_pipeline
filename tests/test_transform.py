@@ -1,5 +1,5 @@
 """
-Basic unit tests for the transform stage.......
+Basic unit tests for the transform stage.
 Run with: pytest tests/
 """
 
@@ -25,12 +25,6 @@ def make_raw_record(temperature=20.0, city_name="TestCity"):
 
 
 
-
-
-
-
-
-
 def test_transform_produces_expected_columns():
     df = transform_all([make_raw_record()])
     expected_cols = {
@@ -47,24 +41,21 @@ def test_transform_drops_null_temperature():
     assert df.empty
 
 
-
-
-
-
 def test_transform_drops_out_of_range_temperature():
     record = make_raw_record(temperature=200.0)  # impossible value
     df = transform_all([record])
     assert df.empty
 
 
-
-
-
-
 def test_transform_handles_missing_key_gracefully():
     broken_record = {"_city_meta": {"name": "X", "country": "ZZ", "lat": 0, "lon": 0}}
     df = transform_all([broken_record])
     assert df.empty
+
+
+
+
+
 
 
 def test_transform_keeps_valid_row():

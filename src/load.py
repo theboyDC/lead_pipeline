@@ -1,10 +1,10 @@
 """
 Load stage: takes the cleaned DataFrame from transform.py and writes it
-into PostgreSQL, following the normalized cities/readings schema..........
+into PostgreSQL, following the normalized cities/readings schema.
 
 For each row: look up (or insert) the city to get its city_id, then
 insert the reading against that city_id. Duplicate readings for the
-same city + timestamp are silently skipped via ON CONFLICT..........
+same city + timestamp are silently skipped via ON CONFLICT.
 """
 
 import logging

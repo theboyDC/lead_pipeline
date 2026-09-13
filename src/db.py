@@ -24,11 +24,3 @@ def get_connection():
         user=os.getenv("DB_USER", "weather_user"),
         password=os.getenv("DB_PASSWORD", "weather_pass"),
     )
-
-
-
-
-
-
-
-
