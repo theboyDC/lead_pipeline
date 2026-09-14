@@ -1,17 +1,24 @@
 services:
-  postgres:
-    image: postgres:16
-    container_name: weather-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: weather_db
-      POSTGRES_USER: weather_user
-      POSTGRES_PASSWORD: weather_pass
+  mongo:
+    image: mongo:7
+    container_name: jhb_leads_mongo
     ports:
-      - "5432:5432"
+      - "27017:27017"
     volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - mongo_data:/data/db
+    restart: unless-stopped
+
+  mongo-express:
+    image: mongo-express:1.0
+    container_name: jhb_leads_mongo_express
+    depends_on:
+      - mongo
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongo
+      ME_CONFIG_BASICAUTH: "false"
+    restart: unless-stopped
 
 volumes:
-  pgdata:
+  mongo_data:

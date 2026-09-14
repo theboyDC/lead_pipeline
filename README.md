@@ -1,155 +1,153 @@
-# Weather ETL Pipeline
+# Johannesburg Tech Startup Lead Pipeline
 
-A small end-to-end data engineering project: it **extracts** hourly weather
-data from the free [Open-Meteo](https://open-meteo.com/) API, **transforms**
-and cleans it with pandas, and **loads** it into a normalized PostgreSQL
-database. Built as a portfolio project to demonstrate fit for a Data
-Engineering elective.
+Finds tech startups and tech companies operating around Johannesburg and
+stores them as unstructured documents in MongoDB, with:
 
-## Why this project
+- **name**
+- **address** (plus lat/lng)
+- **contact details** (phone, website, email where found)
+- **what it does** (a short description scraped from the company's own site)
 
-It touches the core of a real data engineering workflow without needing any
-paid tools or API keys:
-
-- **Extract** — calling a REST API with `requests`, handling failures gracefully
-- **Transform** — cleaning and reshaping JSON into tabular data with `pandas`
-- **Load** — inserting into a normalized relational schema in PostgreSQL, with
-  deduplication handled at the database level
-- **Automation** — designed to be run on a schedule (`cron`) so it builds up a
-  real historical dataset over time
-- **Data quality** — basic validation, null-handling, and sanity bounds on
-  incoming data
-
-## Architecture
+## How it works
 
 ```
- ┌────────────────┐      ┌────────────────┐      ┌──────────────────┐
- │  Open-Meteo API │ ---> │  extract.py     │ ---> │  raw JSON (dict)  │
- └────────────────┘      └────────────────┘      └──────────────────┘
-                                                            │
-                                                            v
-                                                  ┌──────────────────┐
-                                                  │  transform.py     │
-                                                  │  (pandas cleaning)│
-                                                  └──────────────────┘
-                                                            │
-                                                            v
-                                                  ┌──────────────────┐
-                                                  │  load.py          │
-                                                  │  (psycopg2 insert)│
-                                                  └──────────────────┘
-                                                            │
-                                                            v
-                                                  ┌──────────────────┐
-                                                  │  PostgreSQL        │
-                                                  │  cities / readings  │
-                                                  └──────────────────┘
+ ┌────────────────────┐   ┌────────────────────┐   ┌──────────────┐
+ │ LocationIQ Search    │──▶│ Website scrape       │──▶│ transform.py   │
+ │ (extract_places.py)  │   │ (enrich.py)          │   │ build_record   │
+ └────────────────────┘   └────────────────────┘   └──────┬───────┘
+                                                              │
+                                                              ▼
+                                                    ┌────────────────┐
+                                                    │ MongoDB          │
+                                                    │ startups coll.   │
+                                                    │ (load.py upsert) │
+                                                    └────────────────┘
 ```
 
-`pipeline.py` orchestrates all three stages and logs the outcome of each run
-to `logs/pipeline.log`.
+1. **Discover** — `extract_places.py` runs several LocationIQ Search queries
+   (e.g. "tech startup in Johannesburg", "fintech company in Johannesburg",
+   "tech company in Sandton") bounded to a box around Johannesburg. LocationIQ
+   is built on OpenStreetMap data and its search response already includes
+   address, coordinates, and — when tagged in OSM — phone/website/email, so
+   no separate "details" call is needed (`normalize_place` maps the raw
+   result into a consistent shape).
+2. **Enrich** — `enrich.py` visits the company's own website (if listed),
+   respecting `robots.txt`, and pulls a description (meta description /
+   `og:description`, falling back to the first substantial paragraph) plus
+   an email address if one is published.
+3. **Transform** — `transform.py` cleans whitespace, normalizes phone numbers
+   to `+27...` format, and assembles one document per company. Pure
+   functions, fully unit tested without any network calls.
+4. **Load** — `load.py` upserts each document into MongoDB keyed by
+   LocationIQ's `place_id`, so re-running the pipeline updates existing leads
+   instead of duplicating them.
 
-## Database schema
+`pipeline.py` orchestrates all of the above and logs progress/counts to
+`logs/pipeline.log`.
 
-Two normalized tables — one city can have many readings, so city metadata
-isn't repeated on every row (see `db/schema.sql`):
+## Document shape (MongoDB `startups` collection)
 
-- **cities** `(city_id, name, country, latitude, longitude)`
-- **readings** `(reading_id, city_id, recorded_at, temperature_c, humidity_pct, wind_speed_kmh, weather_code, ingested_at)`
-
-A `UNIQUE (city_id, recorded_at)` constraint on `readings` prevents duplicate
-inserts if the pipeline is accidentally run twice for the same hour.
-
-## Project structure
-
+```json
+{
+  "place_id": "281847169325",
+  "name": "Acme Tech",
+  "address": "Acme Tech, 1 Rivonia Rd, Sandton, Johannesburg, Gauteng, 2196, South Africa",
+  "location": { "lat": -26.107, "lng": 28.056 },
+  "contact": {
+    "phone": "+27115550100",
+    "website": "https://acmetech.co.za",
+    "email": "hello@acmetech.co.za"
+  },
+  "description": "We build fintech APIs for African banks.",
+  "types": ["office", "it"],
+  "map_url": "https://www.openstreetmap.org/way/223225532",
+  "source_query": "fintech company in Johannesburg",
+  "scraped_at": "2026-09-14T12:00:00+00:00"
+}
 ```
-weather-etl-pipeline/
-├── README.md
-├── requirements.txt
-├── .env.example
-├── .gitignore
-├── docker-compose.yml
-├── db/
-│   └── schema.sql
-├── src/
-│   ├── extract.py
-│   ├── transform.py
-│   ├── load.py
-│   ├── pipeline.py
-│   └── db.py
-├── notebooks/
-│   └── exploration.ipynb
-├── logs/
-│   └── .gitkeep
-└── tests/
-    └── test_transform.py
-```
+
+It's intentionally schema-flexible — new fields can be added to a record
+(e.g. `funding_stage`, `linkedin`) without a migration.
 
 ## Setup
 
-1. **Clone and install dependencies**
+1. **Get a free LocationIQ API key** — sign up at
+   [locationiq.com](https://locationiq.com), no credit card required (free
+   tier: 5,000 requests/day). Copy `.env.example` to `.env` and fill it in:
 
    ```bash
-   git clone <your-repo-url>
-   cd weather-etl-pipeline
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
+   cp .env.example .env
+   # edit .env: LOCATIONIQ_API_KEY=...
    ```
 
-2. **Start PostgreSQL** (via Docker, easiest option)
+2. **Start MongoDB** (and mongo-express, a web UI at http://localhost:8081
+   for browsing the data):
 
    ```bash
    docker compose up -d
    ```
 
-3. **Configure environment variables**
+3. **Install dependencies**:
 
    ```bash
-   cp .env.example .env
-   # edit .env if you changed any DB credentials in docker-compose.yml
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
    ```
 
-4. **Create the schema**
+4. **Run the pipeline**:
 
    ```bash
-   docker exec -i weather-postgres psql -U weather_user -d weather_db < db/schema.sql
+   python -m src.pipeline --limit 20   # cap results while testing
+   python -m src.pipeline              # full run across all queries
    ```
 
-5. **Run the pipeline**
-
-   ```bash
-   python src/pipeline.py
-   ```
-
-6. **(Optional) Schedule it hourly with cron**
-
-   ```
-   0 * * * * cd /path/to/weather-etl-pipeline && venv/bin/python src/pipeline.py >> logs/pipeline.log 2>&1
-   ```
-
-## Running tests
+## Testing
 
 ```bash
-pytest tests/
+pytest
 ```
 
-## Design decisions worth noting
+Tests cover `transform.py`, `enrich.py`, and `extract_places.py`'s parsing
+logic with fixture HTML/data — no network or API key required to run them.
 
-- **PostgreSQL over SQLite** — chosen to demonstrate a client-server relational
-  database with proper concurrency handling, rather than a single-file DB.
-- **`ON CONFLICT DO NOTHING` for deduplication** — dedup logic lives at the
-  database layer, not in application code, so it holds even if the pipeline
-  is triggered manually or twice.
-- **Every stage logs row counts and errors** — a pipeline that fails silently
-  is a liability; logging is a small step toward observability.
-- **Each stage (extract/transform/load) is a separate module** — keeps the
-  pipeline testable in isolation and mirrors how orchestration tools like
-  Airflow treat pipeline stages as discrete tasks.
+## Compliance notes
 
-## Possible next steps
+- **LocationIQ / OpenStreetMap data is ODbL-licensed** — if you publish or
+  redistribute this data (rather than using it for personal lead-gen), you
+  must attribute "© OpenStreetMap contributors" and share alike under the
+  same license. See [locationiq.com/terms](https://locationiq.com/terms) and
+  [OpenStreetMap's copyright page](https://www.openstreetmap.org/copyright).
+- Coverage depends on OSM's community tagging, so this will surface fewer
+  results than Google Places for the same queries, and some entries will be
+  missing phone/website even where the business exists.
+- **Website scraping** respects `robots.txt` and uses a descriptive
+  `User-Agent`, but you should still keep request volume low and review each
+  target site's terms if scraping beyond a handful of companies.
+- Store `.env` (with your API key) outside of version control — it's already
+  in `.gitignore`.
 
-- Replace the hardcoded city list with a `cities` config table
-- Swap `cron` for Apache Airflow with a proper DAG
-- Add a Streamlit dashboard for visualizing temperature trends over time
-- Containerize the pipeline itself (not just Postgres) with Docker
+## Project structure
+
+```
+lead_pipeline/
+├── README.md
+├── requirements.txt
+├── .env.example
+├── .gitignore
+├── docker-compose.yml
+├── src/
+│   ├── config.py
+│   ├── db.py
+│   ├── extract_places.py
+│   ├── enrich.py
+│   ├── transform.py
+│   ├── load.py
+│   └── pipeline.py
+├── logs/
+│   └── .gitkeep
+└── tests/
+    ├── test_transform.py
+    ├── test_enrich.py
+    └── test_extract_places.py
+```

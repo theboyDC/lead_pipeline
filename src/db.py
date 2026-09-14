@@ -1,26 +1,21 @@
-"""
-Small helper module for creating a PostgreSQL connection.
-Reads credentials from environment variables (loaded from .env via
-python-dotenv), so no secrets are hardcoded in the codebase.
-"""
+"""MongoDB connection helpers."""
+from pymongo import MongoClient
+from pymongo.collection import Collection
 
-import os
-import psycopg2
-from dotenv import load_dotenv
+from src import config
 
-load_dotenv()
+_client = None
 
 
-def get_connection():
-    """
-    Returns a new psycopg2 connection using credentials from .env.
-    Callers are responsible for closing the connection (or using it
-    as a context manager).
-    """
-    return psycopg2.connect(
-        host=os.getenv("DB_HOST", "localhost"),
-        port=os.getenv("DB_PORT", "5432"),
-        dbname=os.getenv("DB_NAME", "weather_db"),
-        user=os.getenv("DB_USER", "weather_user"),
-        password=os.getenv("DB_PASSWORD", "weather_pass"),
-    )
+def get_client() -> MongoClient:
+    global _client
+    if _client is None:
+        _client = MongoClient(config.MONGO_URI)
+    return _client
+
+
+def get_collection() -> Collection:
+    db = get_client()[config.MONGO_DB_NAME]
+    collection = db[config.MONGO_COLLECTION]
+    collection.create_index("place_id", unique=True)
+    return collection
