@@ -3,6 +3,7 @@ data). Free tier: no credit card required, 5,000 requests/day.
 https://locationiq.com/
 """
 import logging
+import time
 
 import requests
 
@@ -10,9 +11,45 @@ from src import config
 
 logger = logging.getLogger(__name__)
 
+_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+
 
 class PlacesAPIError(Exception):
     pass
+
+
+def _is_retryable(exc: requests.RequestException) -> bool:
+    if isinstance(exc, (requests.ConnectionError, requests.Timeout)):
+        return True
+    if isinstance(exc, requests.HTTPError) and exc.response is not None:
+        return exc.response.status_code in _RETRYABLE_STATUS_CODES
+    return False
+
+
+def _get_with_retries(params: dict) -> requests.Response:
+    for attempt in range(1, config.LOCATIONIQ_MAX_RETRIES + 1):
+        try:
+            resp = requests.get(
+                config.LOCATIONIQ_SEARCH_URL, params=params, timeout=config.REQUEST_TIMEOUT_SECONDS
+            )
+            if resp.status_code == 404:
+                # LocationIQ returns 404 with an error body when there are zero results.
+                return resp
+            resp.raise_for_status()
+            return resp
+        except requests.RequestException as exc:
+            if attempt >= config.LOCATIONIQ_MAX_RETRIES or not _is_retryable(exc):
+                raise PlacesAPIError(f"LocationIQ request failed: {exc}") from exc
+            wait = config.LOCATIONIQ_RETRY_BACKOFF_SECONDS * (2 ** (attempt - 1))
+            logger.warning(
+                "attempt %d/%d failed (%s), retrying in %.1fs",
+                attempt,
+                config.LOCATIONIQ_MAX_RETRIES,
+                exc,
+                wait,
+            )
+            time.sleep(wait)
+    raise AssertionError("unreachable")  # loop always returns or raises
 
 
 def search_places(query: str) -> list[dict]:
@@ -20,7 +57,8 @@ def search_places(query: str) -> list[dict]:
 
     Unlike Google Places, LocationIQ's search response already includes
     address/coords and (when tagged in OpenStreetMap) contact extratags, so
-    no separate "details" call is needed.
+    no separate "details" call is needed. Transient failures (timeouts, 429,
+    5xx) are retried with exponential backoff before giving up.
     """
     if not config.LOCATIONIQ_API_KEY:
         raise PlacesAPIError("LOCATIONIQ_API_KEY is not set (see .env.example)")
@@ -38,14 +76,10 @@ def search_places(query: str) -> list[dict]:
         "countrycodes": "za",
     }
 
-    resp = requests.get(
-        config.LOCATIONIQ_SEARCH_URL, params=params, timeout=config.REQUEST_TIMEOUT_SECONDS
-    )
+    resp = _get_with_retries(params)
     if resp.status_code == 404:
-        # LocationIQ returns 404 with an error body when there are zero results.
         logger.info("query=%r returned 0 places", query)
         return []
-    resp.raise_for_status()
     results = resp.json()
 
     logger.info("query=%r returned %d places", query, len(results))
