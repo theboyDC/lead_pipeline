@@ -36,9 +36,15 @@ stores them as unstructured documents in MongoDB, with:
    `og:description`, falling back to the first substantial paragraph) plus
    an email address if one is published.
 3. **Transform** — `transform.py` cleans whitespace, normalizes phone numbers
-   to `+27...` format, and assembles one document per company. Pure
-   functions, fully unit tested without any network calls.
-4. **Load** — `load.py` upserts each document into MongoDB keyed by
+   to `+27...` format, computes a `lead_score` (0-4, one point each for
+   phone/website/email/description present), and assembles one document per
+   company. Pure functions, fully unit tested without any network calls.
+4. **Dedup** — `pipeline.py` tracks the website domain of every company
+   processed in the run; if a later place resolves to a domain already
+   captured (e.g. the same company surfaced by two different search queries,
+   or listed twice in OSM under different `place_id`s), it's skipped before
+   the enrichment scrape runs.
+5. **Load** — `load.py` upserts each document into MongoDB keyed by
    LocationIQ's `place_id`, so re-running the pipeline updates existing leads
    instead of duplicating them.
 
@@ -62,7 +68,8 @@ stores them as unstructured documents in MongoDB, with:
   "types": ["office", "it"],
   "map_url": "https://www.openstreetmap.org/way/223225532",
   "source_query": "fintech company in Johannesburg",
-  "scraped_at": "2026-09-14T12:00:00+00:00"
+  "scraped_at": "2026-09-14T12:00:00+00:00",
+  "lead_score": 4
 }
 ```
 

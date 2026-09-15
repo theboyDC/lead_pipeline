@@ -1,4 +1,4 @@
-from src.transform import build_record, clean_text, normalize_phone
+from src.transform import build_record, clean_text, extract_domain, normalize_phone, score_lead
 
 
 def test_clean_text_collapses_whitespace():
@@ -56,3 +56,44 @@ def test_build_record_handles_missing_fields():
     assert record["contact"]["phone"] is None
     assert record["contact"]["email"] is None
     assert record["location"] == {"lat": None, "lng": None}
+
+
+def test_extract_domain_strips_scheme_and_www():
+    assert extract_domain("https://www.acmetech.co.za/about") == "acmetech.co.za"
+    assert extract_domain("http://acmetech.co.za") == "acmetech.co.za"
+    assert extract_domain("acmetech.co.za") == "acmetech.co.za"
+
+
+def test_extract_domain_none_and_empty():
+    assert extract_domain(None) is None
+    assert extract_domain("") is None
+
+
+def test_score_lead_counts_present_contact_fields():
+    full = {
+        "contact": {"phone": "+27115550100", "website": "https://acmetech.co.za", "email": "hi@acmetech.co.za"},
+        "description": "We build fintech APIs.",
+    }
+    assert score_lead(full) == 4
+
+    empty = {"contact": {}, "description": None}
+    assert score_lead(empty) == 0
+
+    partial = {"contact": {"website": "https://acmetech.co.za"}, "description": None}
+    assert score_lead(partial) == 1
+
+
+def test_build_record_includes_lead_score():
+    place_details = {
+        "name": "Acme Tech",
+        "international_phone_number": "+27 11 555 0100",
+        "website": "https://acmetech.co.za",
+    }
+    enrichment = {"description": "We build fintech APIs.", "email": "hello@acmetech.co.za"}
+
+    record = build_record(place_details, enrichment, place_id="abc123", search_query="fintech company in Johannesburg")
+
+    assert record["lead_score"] == 4
+
+    sparse_record = build_record({}, {}, place_id="xyz", search_query="tech startup in Johannesburg")
+    assert sparse_record["lead_score"] == 0

@@ -2,6 +2,7 @@
 document we store in MongoDB. No network calls in this module."""
 import re
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 _WHITESPACE_RE = re.compile(r"\s+")
 
@@ -27,6 +28,26 @@ def normalize_phone(raw: str | None) -> str | None:
     return digits or None
 
 
+def extract_domain(url: str | None) -> str | None:
+    """Returns the bare registrable-ish domain (no scheme, no www) for dedup."""
+    if not url:
+        return None
+    netloc = urlparse(url if "//" in url else f"//{url}").netloc.lower()
+    if netloc.startswith("www."):
+        netloc = netloc[len("www."):]
+    return netloc or None
+
+
+def score_lead(record: dict) -> int:
+    """0-4 completeness score: one point each for phone, website, email, description."""
+    contact = record.get("contact") or {}
+    return sum(
+        1
+        for value in (contact.get("phone"), contact.get("website"), contact.get("email"), record.get("description"))
+        if value
+    )
+
+
 def build_record(place_details: dict, enrichment: dict, place_id: str, search_query: str) -> dict:
     """Combine a normalized place result and website enrichment into one document."""
     geometry = place_details.get("geometry", {}).get("location", {})
@@ -34,7 +55,7 @@ def build_record(place_details: dict, enrichment: dict, place_id: str, search_qu
         "formatted_phone_number"
     )
 
-    return {
+    record = {
         "place_id": place_id,
         "name": clean_text(place_details.get("name")),
         "address": clean_text(place_details.get("formatted_address")),
@@ -53,3 +74,5 @@ def build_record(place_details: dict, enrichment: dict, place_id: str, search_qu
         "source_query": search_query,
         "scraped_at": datetime.now(timezone.utc).isoformat(),
     }
+    record["lead_score"] = score_lead(record)
+    return record

@@ -31,7 +31,15 @@ def run(queries: list[str], limit: int | None) -> dict:
     collection = get_collection()
 
     seen_place_ids: set[str] = set()
-    stats = {"discovered": 0, "processed": 0, "inserted": 0, "updated": 0, "errors": 0}
+    seen_domains: set[str] = set()
+    stats = {
+        "discovered": 0,
+        "processed": 0,
+        "inserted": 0,
+        "updated": 0,
+        "errors": 0,
+        "skipped_duplicate_domain": 0,
+    }
 
     for query in queries:
         try:
@@ -57,11 +65,22 @@ def run(queries: list[str], limit: int | None) -> dict:
             try:
                 details = extract_places.normalize_place(place)
                 website = details.get("website")
+                domain = transform.extract_domain(website)
+                if domain and domain in seen_domains:
+                    logger.info(
+                        "skipping duplicate domain=%s (place_id=%s), already captured this run",
+                        domain,
+                        place_id,
+                    )
+                    stats["skipped_duplicate_domain"] += 1
+                    continue
                 enrichment = enrich.enrich_from_website(website) if website else {}
                 if not enrichment.get("email"):
                     enrichment["email"] = details.get("email")
                 record = transform.build_record(details, enrichment, place_id, query)
                 is_new = load.upsert_startup(collection, record)
+                if domain:
+                    seen_domains.add(domain)
                 stats["inserted" if is_new else "updated"] += 1
                 stats["processed"] += 1
             except Exception:
