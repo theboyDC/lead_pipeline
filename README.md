@@ -102,6 +102,18 @@ It's intentionally schema-flexible — new fields can be added to a record
    python -m src.pipeline              # full run across all queries
    ```
 
+## Exporting leads
+
+Once leads are in MongoDB, export them to a flat CSV for outreach or CRM import:
+
+```bash
+python -m src.export --out leads.csv
+```
+
+Each row is one company with the nested `location`/`contact` fields flattened
+(`lat`, `lng`, `phone`, `website`, `email`, ...). `leads.csv` is gitignored
+since it contains scraped contact details.
+
 ## Testing
 
 ```bash
@@ -143,6 +155,7 @@ lead_pipeline/
 │   ├── enrich.py
 │   ├── transform.py
 │   ├── load.py
+│   ├── export.py
 │   └── pipeline.py
 ├── logs/
 │   └── .gitkeep
