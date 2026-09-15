@@ -1,4 +1,10 @@
-from src.transform import build_record, clean_text, extract_domain, normalize_phone, score_lead
+from src.transform import (
+    build_record,
+    clean_text,
+    extract_domain,
+    normalize_phone,
+    score_lead,
+)
 
 
 def test_clean_text_collapses_whitespace():

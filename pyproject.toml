@@ -1,0 +1,6 @@
+[tool.ruff.lint]
+# Pyflakes + basic pycodestyle correctness checks, plus import sorting.
+# Deliberately not pulling in opinionated extras (e.g. blind-except, refurb
+# modernizations) that would flag intentional patterns in this codebase, such
+# as enrich.py's broad `except Exception` around best-effort web scraping.
+select = ["E4", "E7", "E9", "F", "I"]
