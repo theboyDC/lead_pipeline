@@ -48,3 +48,33 @@ def test_run_processes_places_without_websites(mock_search, mock_enrich, mock_ge
     assert stats["processed"] == 2
     assert stats["skipped_duplicate_domain"] == 0
     mock_enrich.assert_not_called()
+
+
+@patch("src.pipeline.time.sleep")
+@patch("src.pipeline.get_collection")
+@patch("src.pipeline.enrich.enrich_from_website")
+@patch("src.pipeline.extract_places.lookup_extratags")
+@patch("src.pipeline.extract_places.search_places")
+def test_run_uses_lookup_extratags_for_contact_details(
+    mock_search, mock_lookup, mock_enrich, mock_get_collection, mock_sleep
+):
+    mock_get_collection.return_value = MagicMock()
+    mock_enrich.return_value = {"description": None, "email": None}
+    place = {
+        "place_id": "1",
+        "osm_type": "way",
+        "osm_id": "999",
+        "lat": "-26.1",
+        "lon": "28.0",
+        "display_name": "Acme Tech, Johannesburg",
+        "type": "office",
+        # bare /search result: no extratags inline
+    }
+    mock_search.side_effect = [[place]]
+    mock_lookup.return_value = {"W999": {"extratags": {"website": "https://acmetech.co.za"}}}
+
+    stats = run(["query one"], limit=None)
+
+    assert stats["processed"] == 1
+    mock_lookup.assert_called_once_with([place])
+    mock_enrich.assert_called_once_with("https://acmetech.co.za")

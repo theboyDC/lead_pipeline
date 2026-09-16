@@ -51,6 +51,14 @@ def run(queries: list[str], limit: int | None) -> dict:
 
         time.sleep(config.LOCATIONIQ_MIN_SECONDS_BETWEEN_CALLS)
 
+        try:
+            details_by_ref = extract_places.lookup_extratags(places)
+        except extract_places.PlacesAPIError:
+            logger.exception("extratags lookup failed for query=%r", query)
+            details_by_ref = {}
+
+        time.sleep(config.LOCATIONIQ_MIN_SECONDS_BETWEEN_CALLS)
+
         for place in places:
             place_id = place.get("place_id")
             if not place_id or place_id in seen_place_ids:
@@ -63,7 +71,8 @@ def run(queries: list[str], limit: int | None) -> dict:
                 return stats
 
             try:
-                details = extract_places.normalize_place(place)
+                lookup_details = details_by_ref.get(extract_places.osm_ref(place))
+                details = extract_places.normalize_place(place, lookup_details)
                 website = details.get("website")
                 domain = transform.extract_domain(website)
                 if domain and domain in seen_domains:

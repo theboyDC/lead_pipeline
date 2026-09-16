@@ -38,6 +38,8 @@ REQUEST_TIMEOUT_SECONDS = 10
 SCRAPE_USER_AGENT = "JHBTechLeadBot/1.0 (+contact: lead-pipeline maintainer)"
 
 LOCATIONIQ_SEARCH_URL = "https://us1.locationiq.com/v1/search"
+LOCATIONIQ_LOOKUP_URL = "https://us1.locationiq.com/v1/lookup"
+LOCATIONIQ_LOOKUP_BATCH_SIZE = 50  # LocationIQ's max osm_ids per /lookup call
 LOCATIONIQ_RESULTS_PER_QUERY = 20  # LocationIQ's max `limit` per search request
 LOCATIONIQ_MIN_SECONDS_BETWEEN_CALLS = 1.0  # stay under the free-tier rate limit
 LOCATIONIQ_MAX_RETRIES = 3  # attempts for transient failures (timeouts, 429, 5xx)

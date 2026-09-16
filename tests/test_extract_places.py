@@ -4,7 +4,13 @@ import pytest
 import requests
 
 from src import config
-from src.extract_places import PlacesAPIError, normalize_place, search_places
+from src.extract_places import (
+    PlacesAPIError,
+    lookup_extratags,
+    normalize_place,
+    osm_ref,
+    search_places,
+)
 
 
 def test_normalize_place_maps_locationiq_fields():
@@ -36,6 +42,29 @@ def test_normalize_place_maps_locationiq_fields():
     assert result["geometry"]["location"] == {"lat": -26.1076, "lng": 28.0567}
     assert result["types"] == ["office", "it"]
     assert result["url"] == "https://www.openstreetmap.org/way/223225532"
+
+
+def test_normalize_place_prefers_separate_details_over_inline_extratags():
+    place = {
+        "place_id": "1",
+        "osm_type": "way",
+        "osm_id": "614957091",
+        "lat": "-26.1",
+        "lon": "28.0",
+        "display_name": "Acme Tech, Johannesburg",
+        "type": "office",
+        "extratags": {"website": "https://stale.example"},  # from a bare /search call
+    }
+    details = {
+        "namedetails": {"name": "Acme Tech"},
+        "extratags": {"website": "https://acmetech.co.za", "email": "hello@acmetech.co.za"},
+    }
+
+    result = normalize_place(place, details)
+
+    assert result["name"] == "Acme Tech"
+    assert result["website"] == "https://acmetech.co.za"
+    assert result["email"] == "hello@acmetech.co.za"
 
 
 def test_normalize_place_handles_missing_extratags():
@@ -80,12 +109,31 @@ def test_search_places_raises_without_api_key(mock_get, mock_sleep, monkeypatch)
 
 @patch("src.extract_places.time.sleep")
 @patch("src.extract_places.requests.get")
-def test_search_places_returns_empty_list_on_404(mock_get, mock_sleep, monkeypatch):
+def test_search_places_returns_empty_list_after_retrying_persistent_404(
+    mock_get, mock_sleep, monkeypatch
+):
     monkeypatch.setattr(config, "LOCATIONIQ_API_KEY", "test-key")
+    monkeypatch.setattr(config, "LOCATIONIQ_MAX_RETRIES", 2)
     mock_get.return_value = _mock_response(status_code=404)
 
     assert search_places("no results query") == []
-    mock_get.assert_called_once()
+    assert mock_get.call_count == 2
+    mock_sleep.assert_called_once()
+
+
+@patch("src.extract_places.time.sleep")
+@patch("src.extract_places.requests.get")
+def test_search_places_retries_transient_404_then_succeeds(mock_get, mock_sleep, monkeypatch):
+    monkeypatch.setattr(config, "LOCATIONIQ_API_KEY", "test-key")
+    monkeypatch.setattr(config, "LOCATIONIQ_MAX_RETRIES", 3)
+    success = _mock_response(status_code=200, json_data=[{"place_id": "1"}])
+    mock_get.side_effect = [_mock_response(status_code=404), success]
+
+    results = search_places("tech startup in Johannesburg")
+
+    assert results == [{"place_id": "1"}]
+    assert mock_get.call_count == 2
+    mock_sleep.assert_called_once()
 
 
 @patch("src.extract_places.time.sleep")
@@ -129,3 +177,51 @@ def test_search_places_does_not_retry_non_retryable_http_error(mock_get, mock_sl
 
     mock_get.assert_called_once()
     mock_sleep.assert_not_called()
+
+
+def test_osm_ref_formats_type_and_id():
+    assert osm_ref({"osm_type": "way", "osm_id": "614957091"}) == "W614957091"
+    assert osm_ref({"osm_type": "node", "osm_id": "1"}) == "N1"
+    assert osm_ref({"osm_type": None, "osm_id": "1"}) is None
+    assert osm_ref({}) is None
+
+
+@patch("src.extract_places.time.sleep")
+@patch("src.extract_places.requests.get")
+def test_lookup_extratags_skips_request_when_no_places_have_osm_refs(mock_get, mock_sleep):
+    assert lookup_extratags([{"place_id": "1"}]) == {}
+    mock_get.assert_not_called()
+
+
+@patch("src.extract_places.time.sleep")
+@patch("src.extract_places.requests.get")
+def test_lookup_extratags_batches_and_keys_by_osm_ref(mock_get, mock_sleep, monkeypatch):
+    monkeypatch.setattr(config, "LOCATIONIQ_API_KEY", "test-key")
+    monkeypatch.setattr(config, "LOCATIONIQ_LOOKUP_BATCH_SIZE", 1)
+    places = [
+        {"osm_type": "way", "osm_id": "1"},
+        {"osm_type": "node", "osm_id": "2"},
+    ]
+    mock_get.side_effect = [
+        _mock_response(json_data=[{"osm_type": "way", "osm_id": "1", "extratags": {"website": "a.com"}}]),
+        _mock_response(json_data=[{"osm_type": "node", "osm_id": "2", "extratags": {"website": "b.com"}}]),
+    ]
+
+    result = lookup_extratags(places)
+
+    assert mock_get.call_count == 2
+    assert result["W1"]["extratags"]["website"] == "a.com"
+    assert result["N2"]["extratags"]["website"] == "b.com"
+
+
+@patch("src.extract_places.time.sleep")
+@patch("src.extract_places.requests.get")
+def test_lookup_extratags_raises_without_api_key_when_there_is_something_to_look_up(
+    mock_get, mock_sleep, monkeypatch
+):
+    monkeypatch.setattr(config, "LOCATIONIQ_API_KEY", "")
+
+    with pytest.raises(PlacesAPIError, match="LOCATIONIQ_API_KEY"):
+        lookup_extratags([{"osm_type": "way", "osm_id": "1"}])
+
+    mock_get.assert_not_called()
