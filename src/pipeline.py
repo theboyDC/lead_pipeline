@@ -39,15 +39,19 @@ def run(queries: list[str], limit: int | None) -> dict:
         "updated": 0,
         "errors": 0,
         "skipped_duplicate_domain": 0,
+        "skipped_non_business": 0,
     }
 
     for query in queries:
         try:
-            places = extract_places.search_places(query)
+            raw_places = extract_places.search_places(query)
         except extract_places.PlacesAPIError:
             logger.exception("search failed for query=%r", query)
             stats["errors"] += 1
             continue
+
+        places = [p for p in raw_places if extract_places.is_business_place(p)]
+        stats["skipped_non_business"] += len(raw_places) - len(places)
 
         time.sleep(config.LOCATIONIQ_MIN_SECONDS_BETWEEN_CALLS)
 

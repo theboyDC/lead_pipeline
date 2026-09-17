@@ -20,18 +20,43 @@ JOHANNESBURG_VIEWBOX = (
     f"{JOHANNESBURG_CENTER['lng'] + _LNG_DELTA},{JOHANNESBURG_CENTER['lat'] - _LAT_DELTA}"
 )
 
+# Startup/company categories to search across. Kept generic ("tech startup")
+# plus vertical-specific and ecosystem terms (fintech, AI, SaaS, coworking,
+# accelerators) so discovery isn't limited to one flavor of "tech company" —
+# add a term here to widen coverage without touching the pipeline itself.
+STARTUP_QUERY_TERMS = [
+    "tech startup",
+    "fintech startup",
+    "fintech company",
+    "software company",
+    "software startup",
+    "IT company",
+    "technology company",
+    "startup incubator",
+    "startup accelerator",
+    "coworking space",
+    "AI startup",
+    "SaaS company",
+]
+
+# Johannesburg plus surrounding tech-hub suburbs to spread queries across.
+JOHANNESBURG_AREAS = [
+    "Johannesburg",
+    "Sandton",
+    "Rosebank",
+    "Braamfontein",
+    "Melrose Arch",
+    "Randburg",
+    "Fourways",
+    "Midrand",
+    "Bryanston",
+]
+
 # Varied queries improve coverage: LocationIQ search returns a capped number
-# of results per call (no pagination token like Google), so we spread the
-# search across query terms and known JHB tech hubs instead of one broad query.
+# of results per call (no pagination token like Google), so instead of one
+# broad query we take the cross product of categories x areas above.
 SEARCH_QUERIES = [
-    "tech startup in Johannesburg",
-    "software company in Johannesburg",
-    "fintech company in Johannesburg",
-    "IT company in Johannesburg",
-    "technology company in Sandton",
-    "tech company in Rosebank Johannesburg",
-    "startup incubator Johannesburg",
-    "tech company in Braamfontein Johannesburg",
+    f"{term} in {area}" for term in STARTUP_QUERY_TERMS for area in JOHANNESBURG_AREAS
 ]
 
 REQUEST_TIMEOUT_SECONDS = 10

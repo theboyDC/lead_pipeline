@@ -24,13 +24,21 @@ stores them as unstructured documents in MongoDB, with:
                                                     └────────────────┘
 ```
 
-1. **Discover** — `extract_places.py` runs several LocationIQ Search queries
-   (e.g. "tech startup in Johannesburg", "fintech company in Johannesburg",
-   "tech company in Sandton") bounded to a box around Johannesburg. LocationIQ
-   is built on OpenStreetMap data and its search response already includes
+1. **Discover** — `extract_places.py` runs LocationIQ Search queries bounded
+   to a box around Johannesburg. `config.SEARCH_QUERIES` is the cross product
+   of `STARTUP_QUERY_TERMS` (tech startup, fintech company/startup, software
+   company, IT company, startup incubator/accelerator, coworking space, AI
+   startup, SaaS company, ...) and `JOHANNESBURG_AREAS` (Johannesburg,
+   Sandton, Rosebank, Braamfontein, Melrose Arch, Randburg, Fourways,
+   Midrand, Bryanston) — 108 queries by default. Add a term or area to
+   either list to widen coverage without touching the pipeline. LocationIQ is
+   built on OpenStreetMap data and its search response already includes
    address, coordinates, and — when tagged in OSM — phone/website/email, so
    no separate "details" call is needed (`normalize_place` maps the raw
-   result into a consistent shape).
+   result into a consistent shape). `is_business_place` then drops results
+   that aren't tagged as an actual office/company (e.g. a street, station, or
+   landmark whose name happens to contain "Johannesburg") before the
+   extratags lookup and website scrape run on them.
 2. **Enrich** — `enrich.py` visits the company's own website (if listed),
    respecting `robots.txt`, and pulls a description (meta description /
    `og:description`, falling back to the first substantial paragraph) plus

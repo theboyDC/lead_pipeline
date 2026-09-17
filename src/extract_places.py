@@ -99,6 +99,28 @@ def search_places(query: str) -> list[dict]:
     return results
 
 
+_BUSINESS_CLASSES = {"office"}
+_BUSINESS_AMENITY_TYPES = {"coworking_space"}
+
+
+def is_business_place(place: dict) -> bool:
+    """Best-effort filter to drop non-business OSM results.
+
+    Broad category queries (e.g. "tech company in Rosebank") frequently match
+    a street, station, school, or landmark whose name happens to contain a
+    place name rather than an actual company (e.g. "Johannesburg Road",
+    "Johannesburg Correctional Centre"). Requires OSM tagging that indicates
+    an office/company (`office=*`) or a coworking space
+    (`amenity=coworking_space`); everything else is dropped before the
+    (rate-limited) extratags lookup and website scrape run on it.
+    """
+    place_class = place.get("class")
+    place_type = place.get("type")
+    if place_class in _BUSINESS_CLASSES:
+        return True
+    return place_class == "amenity" and place_type in _BUSINESS_AMENITY_TYPES
+
+
 def osm_ref(place: dict) -> str | None:
     """Build the "W123"/"N123"/"R123" id lookup(osm_ids=...) expects from a
     place's osm_type/osm_id, or None if the place doesn't carry them."""

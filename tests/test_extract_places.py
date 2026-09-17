@@ -6,6 +6,7 @@ import requests
 from src import config
 from src.extract_places import (
     PlacesAPIError,
+    is_business_place,
     lookup_extratags,
     normalize_place,
     osm_ref,
@@ -177,6 +178,25 @@ def test_search_places_does_not_retry_non_retryable_http_error(mock_get, mock_sl
 
     mock_get.assert_called_once()
     mock_sleep.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("place_class", "place_type", "expected"),
+    [
+        ("office", "it", True),
+        ("office", "company", True),
+        ("amenity", "coworking_space", True),
+        ("highway", "primary", False),
+        ("amenity", "prison", False),
+        ("amenity", "university", False),
+        ("tourism", "gallery", False),
+        ("railway", "station", False),
+        (None, None, False),
+    ],
+)
+def test_is_business_place(place_class, place_type, expected):
+    place = {"class": place_class, "type": place_type}
+    assert is_business_place(place) is expected
 
 
 def test_osm_ref_formats_type_and_id():

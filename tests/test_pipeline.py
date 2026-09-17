@@ -11,6 +11,7 @@ def _place(place_id, website, name="Acme"):
         "lat": "-26.1",
         "lon": "28.0",
         "display_name": f"{name}, Johannesburg",
+        "class": "office",
         "type": "office",
     }
 
@@ -67,6 +68,7 @@ def test_run_uses_lookup_extratags_for_contact_details(
         "lat": "-26.1",
         "lon": "28.0",
         "display_name": "Acme Tech, Johannesburg",
+        "class": "office",
         "type": "office",
         # bare /search result: no extratags inline
     }
@@ -78,3 +80,33 @@ def test_run_uses_lookup_extratags_for_contact_details(
     assert stats["processed"] == 1
     mock_lookup.assert_called_once_with([place])
     mock_enrich.assert_called_once_with("https://acmetech.co.za")
+
+
+@patch("src.pipeline.time.sleep")
+@patch("src.pipeline.get_collection")
+@patch("src.pipeline.enrich.enrich_from_website")
+@patch("src.pipeline.extract_places.lookup_extratags")
+@patch("src.pipeline.extract_places.search_places")
+def test_run_filters_out_non_business_places(
+    mock_search, mock_lookup, mock_enrich, mock_get_collection, mock_sleep
+):
+    mock_get_collection.return_value = MagicMock()
+    road = {
+        "place_id": "1",
+        "lat": "-26.1",
+        "lon": "28.0",
+        "display_name": "Johannesburg Road, Johannesburg",
+        "class": "highway",
+        "type": "primary",
+    }
+    office = _place("2", "https://acmetech.co.za")
+    mock_search.side_effect = [[road, office]]
+    mock_lookup.return_value = {}
+    mock_enrich.return_value = {"description": None, "email": None}
+
+    stats = run(["query one"], limit=None)
+
+    assert stats["discovered"] == 1
+    assert stats["processed"] == 1
+    assert stats["skipped_non_business"] == 1
+    mock_lookup.assert_called_once_with([office])
