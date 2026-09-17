@@ -121,6 +121,20 @@ Each row is one company with the nested `location`/`contact` fields flattened
 (`lat`, `lng`, `phone`, `website`, `email`, ...). `leads.csv` is gitignored
 since it contains scraped contact details.
 
+## Dashboard
+
+A Streamlit dashboard reads directly from the MongoDB `startups` collection —
+KPIs (total leads, % with phone/website/email), leads by source query, lead
+score distribution, a map of locations, and a filterable/sortable table.
+
+```bash
+streamlit run src/dashboard.py
+```
+
+Opens at http://localhost:8501. Filter by minimum lead score, source query,
+or name in the sidebar. Data is cached for 60s, so re-run the pipeline and
+refresh the page to see new leads.
+
 ## Testing
 
 ```bash
@@ -163,6 +177,7 @@ lead_pipeline/
 │   ├── transform.py
 │   ├── load.py
 │   ├── export.py
+│   ├── dashboard.py
 │   └── pipeline.py
 ├── logs/
 │   └── .gitkeep
