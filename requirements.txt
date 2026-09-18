@@ -5,4 +5,4 @@ python-dotenv==1.0.1
 pytest==8.3.2
 streamlit==1.64.0
 pandas==2.3.3
-altair==5.5.0
+altair==6.3.0

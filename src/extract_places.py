@@ -3,6 +3,7 @@ data). Free tier: no credit card required, 5,000 requests/day.
 https://locationiq.com/
 """
 import logging
+import re
 import time
 
 import requests
@@ -16,6 +17,17 @@ _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 class PlacesAPIError(Exception):
     pass
+
+
+class PlacesAuthError(PlacesAPIError):
+    """The API key was rejected (401/403); retrying or continuing is pointless."""
+
+
+_KEY_PARAM_RE = re.compile(r"(key=)[^&\s]+")
+
+
+def _redact(text: str) -> str:
+    return _KEY_PARAM_RE.sub(r"\1***", text)
 
 
 def _is_retryable(exc: requests.RequestException) -> bool:
@@ -46,17 +58,24 @@ def _get_with_retries(url: str, params: dict) -> requests.Response:
                 )
                 time.sleep(wait)
                 continue
+            if resp.status_code in (401, 403):
+                raise PlacesAuthError(
+                    f"LocationIQ rejected the API key (HTTP {resp.status_code}); "
+                    "check LOCATIONIQ_API_KEY in .env"
+                ) from None
             resp.raise_for_status()
             return resp
+        except PlacesAuthError:
+            raise
         except requests.RequestException as exc:
             if attempt >= config.LOCATIONIQ_MAX_RETRIES or not _is_retryable(exc):
-                raise PlacesAPIError(f"LocationIQ request failed: {exc}") from exc
+                raise PlacesAPIError(f"LocationIQ request failed: {_redact(str(exc))}") from None
             wait = config.LOCATIONIQ_RETRY_BACKOFF_SECONDS * (2 ** (attempt - 1))
             logger.warning(
                 "attempt %d/%d failed (%s), retrying in %.1fs",
                 attempt,
                 config.LOCATIONIQ_MAX_RETRIES,
-                exc,
+                _redact(str(exc)),
                 wait,
             )
             time.sleep(wait)

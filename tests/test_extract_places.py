@@ -6,6 +6,7 @@ import requests
 from src import config
 from src.extract_places import (
     PlacesAPIError,
+    PlacesAuthError,
     is_business_place,
     lookup_extratags,
     normalize_place,
@@ -245,3 +246,28 @@ def test_lookup_extratags_raises_without_api_key_when_there_is_something_to_look
         lookup_extratags([{"osm_type": "way", "osm_id": "1"}])
 
     mock_get.assert_not_called()
+
+
+@patch("src.extract_places.time.sleep")
+@patch("src.extract_places.requests.get")
+def test_search_places_auth_failure_fails_fast_without_leaking_key(mock_get, mock_sleep, monkeypatch):
+    monkeypatch.setattr(config, "LOCATIONIQ_API_KEY", "pk.secret")
+    mock_get.return_value = MagicMock(status_code=401)
+
+    with pytest.raises(PlacesAuthError) as excinfo:
+        search_places("tech startup in Sandton")
+
+    assert mock_get.call_count == 1  # no retries on a rejected key
+    assert "pk.secret" not in str(excinfo.value)
+
+
+@patch("src.extract_places.time.sleep")
+@patch("src.extract_places.requests.get")
+def test_search_places_redacts_key_from_request_errors(mock_get, mock_sleep, monkeypatch):
+    monkeypatch.setattr(config, "LOCATIONIQ_API_KEY", "pk.secret")
+    mock_get.side_effect = requests.ConnectionError("failed for url: https://x/v1/search?key=pk.secret&q=a")
+
+    with pytest.raises(PlacesAPIError) as excinfo:
+        search_places("tech startup in Sandton")
+
+    assert "pk.secret" not in str(excinfo.value)

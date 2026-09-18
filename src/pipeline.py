@@ -45,6 +45,9 @@ def run(queries: list[str], limit: int | None) -> dict:
     for query in queries:
         try:
             raw_places = extract_places.search_places(query)
+        except extract_places.PlacesAuthError:
+            logger.error("aborting run: LocationIQ rejected the API key")
+            raise
         except extract_places.PlacesAPIError:
             logger.exception("search failed for query=%r", query)
             stats["errors"] += 1
@@ -57,6 +60,9 @@ def run(queries: list[str], limit: int | None) -> dict:
 
         try:
             details_by_ref = extract_places.lookup_extratags(places)
+        except extract_places.PlacesAuthError:
+            logger.error("aborting run: LocationIQ rejected the API key")
+            raise
         except extract_places.PlacesAPIError:
             logger.exception("extratags lookup failed for query=%r", query)
             details_by_ref = {}
@@ -123,4 +129,7 @@ def parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     setup_logging()
     args = parse_args()
-    run(args.queries, args.limit)
+    try:
+        run(args.queries, args.limit)
+    except extract_places.PlacesAuthError as exc:
+        raise SystemExit(f"error: {exc}")
