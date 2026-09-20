@@ -133,7 +133,7 @@ since it contains scraped contact details.
 
 A Streamlit dashboard reads directly from the MongoDB `startups` collection —
 KPIs (total leads, % with phone/website/email), leads by source query, lead
-score distribution, a map of locations, and a filterable/sortable table.
+score distribution, and a filterable/sortable table.
 
 ```bash
 streamlit run src/dashboard.py

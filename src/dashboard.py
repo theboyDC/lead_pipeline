@@ -4,6 +4,7 @@ Usage:
     streamlit run src/dashboard.py
 """
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import altair as alt
@@ -21,7 +22,10 @@ from src.export import flatten_record  # noqa: E402
 PRIMARY_HUE = "#256abf"
 
 
-@st.cache_data(ttl=60)
+REFRESH_INTERVAL_SECONDS = 30
+
+
+@st.cache_data(ttl=REFRESH_INTERVAL_SECONDS)
 def load_leads() -> pd.DataFrame:
     records = list(get_collection().find({}))
     rows = [flatten_record(r) for r in records]
@@ -89,14 +93,6 @@ def render_charts(df: pd.DataFrame) -> None:
     right.altair_chart(score_chart, use_container_width=True)
 
 
-def render_map(df: pd.DataFrame) -> None:
-    map_df = df.dropna(subset=["lat", "lng"]).rename(columns={"lng": "lon"})
-    if map_df.empty:
-        return
-    st.subheader("Locations")
-    st.map(map_df[["lat", "lon"]])
-
-
 def render_table(df: pd.DataFrame) -> None:
     st.subheader(f"Leads ({len(df)})")
     st.dataframe(
@@ -117,11 +113,10 @@ def render_table(df: pd.DataFrame) -> None:
     )
 
 
-def main() -> None:
-    st.set_page_config(page_title="JHB Tech Startup Leads", layout="wide")
-    st.title("Johannesburg Tech Startup Leads")
-
+@st.fragment(run_every=REFRESH_INTERVAL_SECONDS)
+def render_dashboard() -> None:
     df = load_leads()
+    st.caption(f"Auto-refreshes every {REFRESH_INTERVAL_SECONDS}s · last checked {datetime.now():%H:%M:%S}")
     if df.empty:
         st.info("No leads in the database yet. Run `python -m src.pipeline` first.")
         return
@@ -131,9 +126,13 @@ def main() -> None:
     st.divider()
     render_charts(filtered)
     st.divider()
-    render_map(filtered)
-    st.divider()
     render_table(filtered)
+
+
+def main() -> None:
+    st.set_page_config(page_title="JHB Tech Startup Leads", layout="wide")
+    st.title("Johannesburg Tech Startup Leads")
+    render_dashboard()
 
 
 if __name__ == "__main__":
