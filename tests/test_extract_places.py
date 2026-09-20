@@ -200,6 +200,12 @@ def test_is_business_place(place_class, place_type, expected):
     assert is_business_place(place) is expected
 
 
+def test_is_business_place_prefers_lookup_details_over_bare_search_result():
+    assert is_business_place({}, {"class": "office", "type": "it"}) is True
+    assert is_business_place({}, {"class": "amenity", "type": "college"}) is False
+    assert is_business_place({}) is False
+
+
 def test_osm_ref_formats_type_and_id():
     assert osm_ref({"osm_type": "way", "osm_id": "614957091"}) == "W614957091"
     assert osm_ref({"osm_type": "node", "osm_id": "1"}) == "N1"

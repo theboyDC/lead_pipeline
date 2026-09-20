@@ -53,19 +53,27 @@ def run(queries: list[str], limit: int | None) -> dict:
             stats["errors"] += 1
             continue
 
-        places = [p for p in raw_places if extract_places.is_business_place(p)]
-        stats["skipped_non_business"] += len(raw_places) - len(places)
-
         time.sleep(config.LOCATIONIQ_MIN_SECONDS_BETWEEN_CALLS)
 
+        # /search results carry no class/type, so look details up first and
+        # filter on those.
         try:
-            details_by_ref = extract_places.lookup_extratags(places)
+            details_by_ref = extract_places.lookup_extratags(raw_places)
         except extract_places.PlacesAuthError:
             logger.error("aborting run: LocationIQ rejected the API key")
             raise
         except extract_places.PlacesAPIError:
             logger.exception("extratags lookup failed for query=%r", query)
             details_by_ref = {}
+
+        places = [
+            p
+            for p in raw_places
+            if extract_places.is_business_place(
+                p, details_by_ref.get(extract_places.osm_ref(p))
+            )
+        ]
+        stats["skipped_non_business"] += len(raw_places) - len(places)
 
         time.sleep(config.LOCATIONIQ_MIN_SECONDS_BETWEEN_CALLS)
 

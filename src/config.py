@@ -10,14 +10,14 @@ MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "jhb_tech_startups")
 MONGO_COLLECTION = os.getenv("MONGO_COLLECTION", "startups")
 
-# Greater Johannesburg centroid, used to build a bounding box for LocationIQ search.
-JOHANNESBURG_CENTER = {"lat": -26.2041, "lng": 28.0473}
-_LAT_DELTA = 0.27  # ~30km north/south
-_LNG_DELTA = 0.30  # ~30km east/west at this latitude
+# Gauteng province centroid, used to build a bounding box for LocationIQ search.
+GAUTENG_CENTER = {"lat": -26.15, "lng": 28.05}
+_LAT_DELTA = 0.85  # ~95km north/south — Pretoria/Hammanskraal down to Vereeniging
+_LNG_DELTA = 1.05  # ~105km east/west at this latitude — Krugersdorp to Springs/Nigel
 # LocationIQ/Nominatim viewbox format: "min_lon,max_lat,max_lon,min_lat"
-JOHANNESBURG_VIEWBOX = (
-    f"{JOHANNESBURG_CENTER['lng'] - _LNG_DELTA},{JOHANNESBURG_CENTER['lat'] + _LAT_DELTA},"
-    f"{JOHANNESBURG_CENTER['lng'] + _LNG_DELTA},{JOHANNESBURG_CENTER['lat'] - _LAT_DELTA}"
+GAUTENG_VIEWBOX = (
+    f"{GAUTENG_CENTER['lng'] - _LNG_DELTA},{GAUTENG_CENTER['lat'] + _LAT_DELTA},"
+    f"{GAUTENG_CENTER['lng'] + _LNG_DELTA},{GAUTENG_CENTER['lat'] - _LAT_DELTA}"
 )
 
 # Startup/company categories to search across. Kept generic ("tech startup")
@@ -39,8 +39,10 @@ STARTUP_QUERY_TERMS = [
     "SaaS company",
 ]
 
-# Johannesburg plus surrounding tech-hub suburbs to spread queries across.
-JOHANNESBURG_AREAS = [
+# Gauteng tech hubs to spread queries across: Johannesburg + northern
+# suburbs, Pretoria/Tshwane, the East Rand, the West Rand, and the Vaal.
+GAUTENG_AREAS = [
+    # Johannesburg metro
     "Johannesburg",
     "Sandton",
     "Rosebank",
@@ -50,13 +52,33 @@ JOHANNESBURG_AREAS = [
     "Fourways",
     "Midrand",
     "Bryanston",
+    "Roodepoort",
+    "Soweto",
+    # Tshwane / Pretoria
+    "Pretoria",
+    "Centurion",
+    "Menlyn",
+    "Hatfield",
+    # East Rand
+    "Kempton Park",
+    "Germiston",
+    "Boksburg",
+    "Benoni",
+    "Edenvale",
+    "Alberton",
+    "Springs",
+    # West Rand
+    "Krugersdorp",
+    # Vaal
+    "Vereeniging",
+    "Vanderbijlpark",
 ]
 
 # Varied queries improve coverage: LocationIQ search returns a capped number
 # of results per call (no pagination token like Google), so instead of one
 # broad query we take the cross product of categories x areas above.
 SEARCH_QUERIES = [
-    f"{term} in {area}" for term in STARTUP_QUERY_TERMS for area in JOHANNESBURG_AREAS
+    f"{term} in {area}" for term in STARTUP_QUERY_TERMS for area in GAUTENG_AREAS
 ]
 
 REQUEST_TIMEOUT_SECONDS = 10

@@ -83,7 +83,7 @@ def _get_with_retries(url: str, params: dict) -> requests.Response:
 
 
 def search_places(query: str) -> list[dict]:
-    """Run a LocationIQ Search query, bounded to the Johannesburg area.
+    """Run a LocationIQ Search query, bounded to the Gauteng province.
 
     Deliberately does NOT request extratags/namedetails here: LocationIQ's
     /search endpoint reliably 404s ("Unable to geocode") when those params
@@ -103,7 +103,7 @@ def search_places(query: str) -> list[dict]:
         "format": "json",
         "addressdetails": 1,
         "limit": config.LOCATIONIQ_RESULTS_PER_QUERY,
-        "viewbox": config.JOHANNESBURG_VIEWBOX,
+        "viewbox": config.GAUTENG_VIEWBOX,
         "bounded": 1,
         "countrycodes": "za",
     }
@@ -122,7 +122,7 @@ _BUSINESS_CLASSES = {"office"}
 _BUSINESS_AMENITY_TYPES = {"coworking_space"}
 
 
-def is_business_place(place: dict) -> bool:
+def is_business_place(place: dict, details: dict | None = None) -> bool:
     """Best-effort filter to drop non-business OSM results.
 
     Broad category queries (e.g. "tech company in Rosebank") frequently match
@@ -131,10 +131,15 @@ def is_business_place(place: dict) -> bool:
     "Johannesburg Correctional Centre"). Requires OSM tagging that indicates
     an office/company (`office=*`) or a coworking space
     (`amenity=coworking_space`); everything else is dropped before the
-    (rate-limited) extratags lookup and website scrape run on it.
+    website scrape runs on it.
+
+    LocationIQ's /search omits `class`/`type`; they only come back from
+    /lookup, so pass that result as `details` (falls back to `place` for
+    callers that already have them inline).
     """
-    place_class = place.get("class")
-    place_type = place.get("type")
+    details = details or {}
+    place_class = details.get("class") or place.get("class")
+    place_type = details.get("type") or place.get("type")
     if place_class in _BUSINESS_CLASSES:
         return True
     return place_class == "amenity" and place_type in _BUSINESS_AMENITY_TYPES
