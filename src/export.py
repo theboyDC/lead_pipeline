@@ -27,6 +27,7 @@ CSV_FIELDS = [
     "scraped_at",
     "place_id",
     "lead_score",
+    "status",
 ]
 
 
@@ -49,6 +50,7 @@ def flatten_record(record: dict) -> dict:
         "scraped_at": record.get("scraped_at"),
         "place_id": record.get("place_id"),
         "lead_score": record.get("lead_score"),
+        "status": record.get("status", "new"),
     }
 
 
